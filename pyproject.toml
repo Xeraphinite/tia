@@ -23,7 +23,6 @@ dev = [
 [tool.pytest.ini_options]
 addopts = "-q"
 asyncio_mode = "auto"
-markers = ["live: tests that call paid external services and require explicit opt-in"]
 testpaths = ["tests"]
 
 [tool.ruff]
