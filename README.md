@@ -29,6 +29,27 @@ uv sync --dev
 uv run python main.py
 ```
 
+## Streamlit frontend
+
+Tiny Agent includes a chat frontend with multiple conversation sessions, prompt starters, safe error
+states, and a collapsible trace for each run. Start the API in one terminal:
+
+```bash
+uv run python main.py
+```
+
+Then start Streamlit in another:
+
+```bash
+uv run streamlit run streamlit_app.py
+```
+
+Open `http://localhost:8501`. The sidebar lets you create, switch, rename, and remove conversations.
+Each conversation keeps an isolated chat history and its own API session ID. These frontend records
+live in the current browser tab; the API remains the owner of runtime conversation state.
+`TIA_API_URL` and `TIA_USER_ID` provide optional defaults. Restarting the API invalidates its existing
+runtime sessions, so create a new conversation after an API restart.
+
 ## Model provider
 
 OpenRouter is the initial provider. Store its key as `OPENAI_API_KEY` in a local `.env` file. Local
