@@ -1,7 +1,39 @@
 [project]
 name = "tia"
 version = "0.1.0"
-description = "Add your description here"
+description = "A tiny, provider-neutral agent framework and runtime"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "fastapi>=0.139.2",
+    "litellm>=1.75,<1.76",
+    "pydantic>=2.13.4",
+    "python-dotenv>=1.2.2",
+    "uvicorn>=0.51.0",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=2.3.0",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.15.22",
+]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+asyncio_mode = "auto"
+markers = ["live: tests that call paid external services and require explicit opt-in"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
