@@ -1,15 +1,17 @@
-"""Streamlit interaction tests for frontend session controls."""
+"""Integration tests for Streamlit session controls."""
 
 from __future__ import annotations
 
 from pathlib import Path
 from typing import cast
 
+import pytest
 from streamlit.testing.v1 import AppTest
 
 from frontend.sessions import ConversationState
 
-APP_PATH = Path(__file__).parents[1] / "streamlit_app.py"
+APP_PATH = Path(__file__).parents[2] / "streamlit_app.py"
+pytestmark = pytest.mark.integration
 
 
 def test_sidebar_creates_renames_switches_and_removes_conversations() -> None:

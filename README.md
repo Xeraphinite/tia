@@ -151,11 +151,22 @@ uv run mypy .
 uv run pytest
 ```
 
+Every test has exactly one primary category marker, enforced during collection. Run focused suites
+with:
+
+```bash
+uv run pytest -m unit
+uv run pytest -m integration
+uv run pytest -m environment
+TIA_RUN_REAL_TESTS=1 uv run pytest -m provider
+TIA_RUN_E2E_TESTS=1 uv run pytest -m e2e
+```
+
 The paid real-provider scenario uses `openai/gpt-5.6-luna` to run weather and Todo tools, then verifies
 a tool-using follow-up in the same session:
 
 ```bash
-TIA_RUN_REAL_TESTS=1 uv run pytest tests/real/test_openrouter.py -vv
+TIA_RUN_REAL_TESTS=1 uv run pytest tests/provider/test_openrouter.py -vv
 ```
 
 The browser end-to-end scenario launches a real FastAPI service and Streamlit frontend on temporary

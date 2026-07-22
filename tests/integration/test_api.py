@@ -1,7 +1,8 @@
-"""HTTP boundary tests using the complete application stack."""
+"""Integration tests for the HTTP boundary and application stack."""
 
 from __future__ import annotations
 
+import pytest
 from httpx import ASGITransport, AsyncClient
 
 from agent.runner import AgentRunner
@@ -10,6 +11,8 @@ from memory.store import InMemorySessionStore
 from runtime.builtin_tools import create_builtin_registry
 from runtime.contracts import ModelResponse
 from tests.helpers import ScriptedModel
+
+pytestmark = pytest.mark.integration
 
 
 async def test_api_creates_session_and_continues_conversation() -> None:

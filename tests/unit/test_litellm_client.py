@@ -1,4 +1,4 @@
-"""Contract tests for the provider boundary and parsing logic."""
+"""Unit tests for the provider boundary and parsing logic."""
 
 from __future__ import annotations
 
@@ -8,6 +8,8 @@ import pytest
 
 from runtime.contracts import Message, ModelClientError, ToolDefinition
 from runtime.litellm_client import LiteLLMClient, parse_litellm_response
+
+pytestmark = pytest.mark.unit
 
 
 def test_parser_extracts_reasoning_calls_content_and_usage() -> None:

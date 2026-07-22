@@ -27,6 +27,13 @@ dev = [
 addopts = "-q"
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    "unit: isolated component and contract tests with local doubles",
+    "integration: multi-component runtime, API, storage, or Streamlit tests",
+    "environment: installed dependency and runtime smoke tests",
+    "provider: opt-in tests that call a real external model provider",
+    "e2e: opt-in browser tests across the complete deployed application flow",
+]
 
 [tool.ruff]
 line-length = 100

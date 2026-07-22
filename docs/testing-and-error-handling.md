@@ -54,13 +54,15 @@ weather backends return stable fixtures.
 Tests should mirror implementation boundaries:
 
 ```text
-tests/agent/       loop decisions, limits, and orchestration
-tests/runtime/     model parsing, registry, executor, and built-in tools
-tests/memory/      session stores, context selection, and compression
-tests/api/         ownership and HTTP translation
-tests/integration/ complete multi-step user scenarios
-tests/env/         dependency checks
+tests/unit/         isolated contracts, parsing, tools, and frontend state
+tests/integration/  agent loop, API, SQLite, and Streamlit component integration
+tests/environment/  installed dependency checks
+tests/provider/     opt-in real-provider scenarios
+tests/e2e/          opt-in browser-to-provider application flows
 ```
+
+Pytest markers mirror these directories, and collection fails when a test has no primary category or
+more than one. Shared deterministic doubles remain in `tests/helpers.py` rather than a test suite.
 
 ## Required test cases
 

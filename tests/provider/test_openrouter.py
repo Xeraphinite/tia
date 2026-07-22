@@ -1,4 +1,4 @@
-"""Paid, real-provider scenarios. Enable with TIA_RUN_REAL_TESTS=1."""
+"""Paid provider tests. Enable with TIA_RUN_REAL_TESTS=1."""
 
 from __future__ import annotations
 
@@ -13,9 +13,13 @@ from runtime.builtin_tools import create_builtin_registry
 from runtime.events import TraceKind
 from runtime.litellm_client import LiteLLMClient
 
-pytestmark = pytest.mark.skipif(
-    os.getenv("TIA_RUN_REAL_TESTS") != "1", reason="real OpenRouter tests are opt-in"
-)
+pytestmark = [
+    pytest.mark.provider,
+    pytest.mark.skipif(
+        os.getenv("TIA_RUN_REAL_TESTS") != "1",
+        reason="real OpenRouter tests are opt-in",
+    ),
+]
 
 
 async def test_luna_runs_multi_tool_scenario_and_session_followup(tmp_path: Path) -> None:

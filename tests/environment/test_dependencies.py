@@ -1,4 +1,10 @@
+"""Environment dependency smoke tests."""
+
 from importlib.metadata import version
+
+import pytest
+
+pytestmark = pytest.mark.environment
 
 
 def test_runtime_dependencies_are_installed() -> None:

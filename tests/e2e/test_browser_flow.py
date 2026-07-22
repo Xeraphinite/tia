@@ -19,10 +19,13 @@ from dotenv import load_dotenv
 from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import Page, expect, sync_playwright
 
-pytestmark = pytest.mark.skipif(
-    os.getenv("TIA_RUN_E2E_TESTS") != "1",
-    reason="browser end-to-end tests are opt-in",
-)
+pytestmark = [
+    pytest.mark.e2e,
+    pytest.mark.skipif(
+        os.getenv("TIA_RUN_E2E_TESTS") != "1",
+        reason="browser end-to-end tests are opt-in",
+    ),
+]
 
 ROOT = Path(__file__).parents[2]
 WEATHER_PROMPT = (

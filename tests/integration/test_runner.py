@@ -1,4 +1,4 @@
-"""End-to-end deterministic tests for the complete agent loop."""
+"""Integration tests for the complete deterministic agent loop."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import asyncio
 import json
 from collections.abc import Sequence
 
+import pytest
 from pydantic import BaseModel, ConfigDict
 
 from agent.runner import AgentLimits, AgentRunner
@@ -23,6 +24,8 @@ from runtime.contracts import (
 from runtime.events import ModelMessageEvent, SummaryEvent, ToolResultEvent, TraceEvent, TraceKind
 from runtime.tools import Tool, ToolContext, ToolRegistry
 from tests.helpers import ScriptedModel, SleepingModel
+
+pytestmark = pytest.mark.integration
 
 
 def call(name: str, arguments: dict[str, object], call_id: str = "call-1") -> ToolCall:

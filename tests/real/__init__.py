@@ -1,2 +1,0 @@
-"""Real-provider integration scenarios."""
-

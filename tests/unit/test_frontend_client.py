@@ -1,4 +1,4 @@
-"""Tests for the Streamlit frontend's narrow API client."""
+"""Unit tests for the Streamlit frontend's narrow API client."""
 
 from __future__ import annotations
 
@@ -11,6 +11,8 @@ from frontend.client import (
     TinyAgentClient,
     TransportResponse,
 )
+
+pytestmark = pytest.mark.unit
 
 
 class StubTransport:

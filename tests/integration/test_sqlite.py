@@ -1,4 +1,4 @@
-"""Durability and isolation tests for the SQLite adapters."""
+"""Integration tests for SQLite durability and isolation."""
 
 from __future__ import annotations
 
@@ -17,6 +17,8 @@ from runtime.errors import SessionExistsError, SessionOwnershipError
 from runtime.events import ModelMessageEvent, ToolResultEvent, UserMessageEvent
 from runtime.tools import ToolContext, ToolExecutor
 from tests.helpers import ScriptedModel, SleepingModel
+
+pytestmark = pytest.mark.integration
 
 
 def _call(name: str, arguments: JSONObject, call_id: str) -> ToolCall:

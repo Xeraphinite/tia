@@ -1,4 +1,4 @@
-"""Behavioral tests for tool contracts and built-in implementations."""
+"""Unit tests for tool contracts and built-in implementations."""
 
 from __future__ import annotations
 
@@ -11,6 +11,8 @@ from pydantic import BaseModel, ConfigDict
 from runtime.builtin_tools import InMemoryTodoStore, create_builtin_registry
 from runtime.contracts import JSONObject, JSONValue
 from runtime.tools import Tool, ToolContext, ToolExecutor, ToolRegistry
+
+pytestmark = pytest.mark.unit
 
 
 async def test_registry_exposes_name_description_and_json_schema() -> None:

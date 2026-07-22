@@ -1,10 +1,12 @@
-"""Tests for frontend conversation session management."""
+"""Unit tests for frontend conversation session management."""
 
 from __future__ import annotations
 
 import pytest
 
 from frontend.sessions import ChatMessage, ConversationState
+
+pytestmark = pytest.mark.unit
 
 
 def test_conversations_preserve_isolated_messages_and_runtime_sessions() -> None:
