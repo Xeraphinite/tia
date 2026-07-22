@@ -22,6 +22,9 @@ class TraceEntry(BaseModel):
     sequence: int
     kind: str
     data: JSONObject
+    turn_id: str = ""
+    trace_id: str = ""
+    event_id: str = ""
 
 
 class APIError(BaseModel):
@@ -31,6 +34,16 @@ class APIError(BaseModel):
 
     code: str
     message: str
+
+
+class UsageResult(BaseModel):
+    """Normalized model usage returned by the API."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
 
 
 class MessageResult(BaseModel):
@@ -43,6 +56,9 @@ class MessageResult(BaseModel):
     answer: str | None
     error: APIError | None
     trace: tuple[TraceEntry, ...]
+    turn_id: str = ""
+    trace_id: str = ""
+    usage: UsageResult = UsageResult()
 
 
 class _CreateSessionResult(BaseModel):
@@ -68,7 +84,9 @@ class TransportResponse:
 class HTTPTransport(Protocol):
     """Minimal replaceable transport used by the frontend client."""
 
-    def post(self, url: str, payload: bytes, timeout_seconds: float) -> TransportResponse:
+    def post(
+        self, url: str, payload: bytes, timeout_seconds: float, user_id: str
+    ) -> TransportResponse:
         """Send JSON and return the status and raw body."""
         ...
 
@@ -76,12 +94,18 @@ class HTTPTransport(Protocol):
 class UrllibTransport:
     """Standard-library JSON transport with bounded requests."""
 
-    def post(self, url: str, payload: bytes, timeout_seconds: float) -> TransportResponse:
+    def post(
+        self, url: str, payload: bytes, timeout_seconds: float, user_id: str
+    ) -> TransportResponse:
         request = Request(
             url,
             data=payload,
             method="POST",
-            headers={"Accept": "application/json", "Content-Type": "application/json"},
+            headers={
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "X-User-ID": user_id,
+            },
         )
         try:
             response = cast(HTTPResponse, urlopen(request, timeout=timeout_seconds))
@@ -132,7 +156,7 @@ class TinyAgentClient:
 
     def create_session(self, user_id: str) -> str:
         """Create a new API-owned conversation window."""
-        response = self._post("/v1/sessions", {"user_id": user_id})
+        response = self._post("/v1/sessions", {}, user_id)
         try:
             return _CreateSessionResult.model_validate_json(response.body).session_id
         except ValidationError as exc:
@@ -142,19 +166,20 @@ class TinyAgentClient:
         """Submit one turn and parse its terminal result."""
         response = self._post(
             f"/v1/sessions/{session_id}/messages",
-            {"user_id": user_id, "message": message},
+            {"message": message},
+            user_id,
         )
         try:
             return MessageResult.model_validate_json(response.body)
         except ValidationError as exc:
             raise self._invalid_response() from exc
 
-    def _post(self, path: str, payload: JSONObject) -> TransportResponse:
+    def _post(self, path: str, payload: JSONObject, user_id: str) -> TransportResponse:
         import json
 
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         response = self._transport.post(
-            f"{self._base_url}{path}", body, self._timeout_seconds
+            f"{self._base_url}{path}", body, self._timeout_seconds, user_id
         )
         if 200 <= response.status < 300:
             return response

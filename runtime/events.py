@@ -13,11 +13,17 @@ class TraceKind(StrEnum):
     """Observable execution milestones."""
 
     TURN_STARTED = "turn_started"
+    CONTEXT_BUILT = "context_built"
+    CONTEXT_COMPRESSED = "context_compressed"
     MODEL_STARTED = "model_started"
+    MODEL_COMPLETED = "model_completed"
     MODEL_RETRY = "model_retry"
+    FORMAT_REPAIR = "format_repair"
     MODEL_DECISION = "model_decision"
     TOOL_STARTED = "tool_started"
     TOOL_FINISHED = "tool_finished"
+    LOOP_DETECTED = "loop_detected"
+    TURN_CANCELLED = "turn_cancelled"
     TURN_FINISHED = "turn_finished"
 
 
@@ -28,6 +34,9 @@ class UserMessageEvent:
     content: str
     sequence: int = 0
     created_at: datetime = field(default_factory=lambda: datetime.min.replace(tzinfo=UTC))
+    turn_id: str = ""
+    trace_id: str = ""
+    event_id: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,6 +46,9 @@ class ModelMessageEvent:
     response: ModelResponse
     sequence: int = 0
     created_at: datetime = field(default_factory=lambda: datetime.min.replace(tzinfo=UTC))
+    turn_id: str = ""
+    trace_id: str = ""
+    event_id: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,6 +60,9 @@ class ToolResultEvent:
     content: str
     sequence: int = 0
     created_at: datetime = field(default_factory=lambda: datetime.min.replace(tzinfo=UTC))
+    turn_id: str = ""
+    trace_id: str = ""
+    event_id: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,6 +73,9 @@ class SummaryEvent:
     through_sequence: int
     sequence: int = 0
     created_at: datetime = field(default_factory=lambda: datetime.min.replace(tzinfo=UTC))
+    turn_id: str = ""
+    trace_id: str = ""
+    event_id: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,6 +86,9 @@ class TraceEvent:
     data: JSONObject
     sequence: int = 0
     created_at: datetime = field(default_factory=lambda: datetime.min.replace(tzinfo=UTC))
+    turn_id: str = ""
+    trace_id: str = ""
+    event_id: str = ""
 
 
 type SessionEvent = (

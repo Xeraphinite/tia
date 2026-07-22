@@ -57,6 +57,21 @@ class LiteLLMClient:
             raise
         except Exception as exc:
             name = type(exc).__name__.casefold()
+            detail = str(exc).casefold()
+            if any(
+                marker in detail
+                for marker in (
+                    "context length",
+                    "context window",
+                    "maximum context",
+                    "too many tokens",
+                )
+            ):
+                raise ModelClientError(
+                    "context_overflow",
+                    "The model context exceeded the provider limit.",
+                    retryable=False,
+                ) from None
             retryable = any(
                 marker in name for marker in ("timeout", "rate", "connection", "serviceunavailable")
             )

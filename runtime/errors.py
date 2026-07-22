@@ -50,3 +50,14 @@ class InvalidInputError(TinyAgentError):
 
     code = "invalid_input"
 
+
+class ContextOverflowError(TinyAgentError):
+    """Raised when required model context cannot fit the configured hard limit."""
+
+    code = "context_overflow"
+
+
+class StorageError(TinyAgentError):
+    """Raised when durable state cannot be read or written safely."""
+
+    code = "storage_failure"

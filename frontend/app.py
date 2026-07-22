@@ -53,7 +53,7 @@ def _render_sidebar() -> None:
             user_id = st.text_input(
                 "User ID",
                 value=cast(str, st.session_state["active_user_id"]),
-                help="Owns this conversation window and shared todo state.",
+                help="Owns this conversation window; todos remain scoped to the window.",
             )
             applied = st.form_submit_button(
                 "Apply settings", icon=":material/check:", width="stretch"
@@ -216,9 +216,15 @@ def _submit(prompt: str) -> None:
                 conversation.api_session_id = session_id
             result = client.send_message(user_id, session_id, prompt)
             status.update(label="Run complete", state="complete")
-        if result.status == "completed" and result.answer:
+        if result.answer:
+            content = result.answer
+            if result.status == "step_limit" and result.error:
+                content = f"{content}\n\n_Run ended: {result.error.message}_"
             assistant_message = ChatMessage(
-                role="assistant", content=result.answer, trace=result.trace
+                role="assistant",
+                content=content,
+                trace=result.trace,
+                is_error=result.status not in {"completed", "step_limit"},
             )
         else:
             error_message = (

@@ -27,7 +27,7 @@ class SessionHandle(Protocol):
         """Return the current append-only history."""
         ...
 
-    def append(self, event: SessionEvent) -> SessionEvent:
+    async def append(self, event: SessionEvent) -> SessionEvent:
         """Append and sequence one event."""
         ...
 
@@ -49,12 +49,29 @@ class SessionStore(Protocol):
         """Read a session after verifying ownership."""
         ...
 
+    async def get_session(self, user_id: str, session_id: str) -> SessionMetadata:
+        """Read owned session metadata."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class SessionMetadata:
+    """Public provider-neutral metadata for one conversation window."""
+
+    session_id: str
+    user_id: str
+    created_at: datetime
+    updated_at: datetime
+    event_count: int
+
 
 @dataclass(slots=True)
 class _SessionData:
     user_id: str
     events: list[SessionEvent] = field(default_factory=list)
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    created_at: datetime = field(default_factory=lambda: datetime.now(tz=UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(tz=UTC))
 
 
 class _InMemoryHandle:
@@ -65,13 +82,15 @@ class _InMemoryHandle:
     def events(self) -> tuple[SessionEvent, ...]:
         return tuple(self._data.events)
 
-    def append(self, event: SessionEvent) -> SessionEvent:
+    async def append(self, event: SessionEvent) -> SessionEvent:
         stored = replace(
             event,
             sequence=len(self._data.events) + 1,
             created_at=datetime.now(tz=UTC),
+            event_id=uuid4().hex,
         )
         self._data.events.append(stored)
+        self._data.updated_at = stored.created_at
         return stored
 
 
@@ -123,6 +142,18 @@ class InMemorySessionStore:
         data = await self._owned_session(user_id, session_id)
         async with data.lock:
             return tuple(data.events)
+
+    async def get_session(self, user_id: str, session_id: str) -> SessionMetadata:
+        """Return metadata after verifying ownership."""
+        data = await self._owned_session(user_id, session_id)
+        async with data.lock:
+            return SessionMetadata(
+                session_id=session_id,
+                user_id=data.user_id,
+                created_at=data.created_at,
+                updated_at=data.updated_at,
+                event_count=len(data.events),
+            )
 
     async def _owned_session(self, user_id: str, session_id: str) -> _SessionData:
         async with self._catalog_lock:

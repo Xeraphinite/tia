@@ -10,6 +10,7 @@ from typing import Protocol, cast
 from pydantic import BaseModel, ValidationError
 
 from runtime.contracts import JSONObject, JSONValue, ToolDefinition
+from runtime.errors import TinyAgentError
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,6 +29,16 @@ class ToolHandler(Protocol):
         ...
 
 
+class ToolDomainError(Exception):
+    """A safe domain failure that the model may correct."""
+
+    def __init__(self, code: str, message: str, *, details: JSONValue | None = None) -> None:
+        super().__init__(message)
+        self.code = code
+        self.safe_message = message
+        self.details = details
+
+
 @dataclass(frozen=True, slots=True)
 class Tool:
     """A registered tool and its validation contract."""
@@ -36,8 +47,15 @@ class Tool:
     description: str
     arguments_model: type[BaseModel]
     handler: ToolHandler
-    side_effecting: bool = False
+    timeout_seconds: float = 10.0
+    read_only: bool = True
+    idempotent: bool = True
     sensitive_fields: frozenset[str] = frozenset()
+    sensitive_result_fields: frozenset[str] = frozenset()
+
+    def __post_init__(self) -> None:
+        if self.timeout_seconds <= 0:
+            raise ValueError("tool timeout must be positive")
 
     def definition(self) -> ToolDefinition:
         """Return the JSON Schema shown to the model."""
@@ -102,7 +120,7 @@ class ToolExecutor:
         if tool is None:
             return self._error("unknown_tool", f"No tool named '{name}' is registered.")
         if parse_error is not None or arguments is None:
-            return self._error("invalid_tool_arguments", "Tool arguments were not valid JSON.")
+            return self._error("invalid_arguments", "Tool arguments were not valid JSON.")
 
         try:
             validated = tool.arguments_model.model_validate(arguments)
@@ -118,14 +136,14 @@ class ToolExecutor:
                 for item in exc.errors(include_url=False, include_input=False)
             ]
             return self._error(
-                "invalid_tool_arguments",
+                "invalid_arguments",
                 "Tool arguments failed Schema validation.",
                 details=details,
             )
 
         normalized = _as_json_object(validated.model_dump(mode="json"))
         try:
-            async with asyncio.timeout(self._timeout_seconds):
+            async with asyncio.timeout(min(self._timeout_seconds, tool.timeout_seconds)):
                 result = await tool.handler(context, normalized)
             content = json.dumps(
                 {"ok": True, "result": result}, ensure_ascii=False, separators=(",", ":")
@@ -134,8 +152,12 @@ class ToolExecutor:
             return self._error("tool_timeout", f"Tool '{name}' exceeded its time limit.")
         except asyncio.CancelledError:
             raise
+        except TinyAgentError:
+            raise
+        except ToolDomainError as exc:
+            return self._error(exc.code, exc.safe_message, details=exc.details)
         except Exception:
-            return self._error("tool_execution_failed", f"Tool '{name}' failed safely.")
+            return self._error("tool_failed", f"Tool '{name}' failed safely.")
 
         if len(content) > self._max_output_chars:
             return self._error(
@@ -164,6 +186,24 @@ def redact_arguments(tool: Tool | None, arguments: JSONObject | None) -> JSONObj
     return {
         key: "[REDACTED]" if key in sensitive else value for key, value in arguments.items()
     }
+
+
+def redact_result_content(tool: Tool | None, content: str) -> str:
+    """Redact configured top-level result fields before persistence or model reuse."""
+    if tool is None or not tool.sensitive_result_fields:
+        return content
+    try:
+        value = json.loads(content)
+    except json.JSONDecodeError:
+        return "[REDACTED]"
+    if not isinstance(value, dict):
+        return content
+    result = value.get("result")
+    if isinstance(result, dict):
+        for field in tool.sensitive_result_fields:
+            if field in result:
+                result[field] = "[REDACTED]"
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
 
 def _as_json_object(value: object) -> JSONObject:
