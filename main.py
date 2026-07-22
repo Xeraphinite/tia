@@ -10,7 +10,7 @@ from fastapi import FastAPI
 
 from agent.runner import AgentRunner
 from api.app import create_app
-from memory.store import InMemorySessionStore
+from memory.sqlite import SQLiteSessionStore, SQLiteTodoStore
 from runtime.builtin_tools import create_builtin_registry
 from runtime.litellm_client import LiteLLMClient
 
@@ -18,8 +18,9 @@ from runtime.litellm_client import LiteLLMClient
 def build_app() -> FastAPI:
     """Compose the default local runtime without hiding an event loop."""
     load_dotenv()
-    sessions = InMemorySessionStore()
-    tools = create_builtin_registry()
+    database_path = os.getenv("TIA_DATABASE_PATH", "tia.sqlite3")
+    sessions = SQLiteSessionStore(database_path)
+    tools = create_builtin_registry(todo_store=SQLiteTodoStore(database_path))
     model = LiteLLMClient(os.getenv("TIA_MODEL", "openai/gpt-5.4-nano"))
     runner = AgentRunner(model=model, tools=tools, sessions=sessions)
     return create_app(runner=runner, sessions=sessions)

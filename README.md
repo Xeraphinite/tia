@@ -47,8 +47,8 @@ uv run streamlit run streamlit_app.py
 Open `http://localhost:8501`. The sidebar lets you create, switch, rename, and remove conversations.
 Each conversation keeps an isolated chat history and its own API session ID. These frontend records
 live in the current browser tab; the API remains the owner of runtime conversation state.
-`TIA_API_URL` and `TIA_USER_ID` provide optional defaults. Restarting the API invalidates its existing
-runtime sessions, so create a new conversation after an API restart.
+`TIA_API_URL` and `TIA_USER_ID` provide optional defaults. API sessions and todos survive restarts in
+`tia.sqlite3` by default; `TIA_DATABASE_PATH` selects another database file.
 
 ## Model provider
 
@@ -73,7 +73,8 @@ Each run follows one visible bounded loop:
 4. Parse final text, reasoning metadata, usage, and tool calls at the LiteLLM boundary.
 5. Validate each tool call with Pydantic, execute it under a timeout, and pair its structured result
    with the original tool-call ID.
-6. Repeat until the model returns a final answer or a typed limit/error ends the turn.
+6. Repair one empty model response, when needed, then repeat until a final answer or typed terminal
+   outcome ends the turn.
 
 Raw hidden model reasoning is recognized but is neither persisted nor included in later context or
 public traces. This preserves decision observability (`final` versus `tool_calls`) without retaining
@@ -85,28 +86,31 @@ The default registry contains four tools:
 |---|---|
 | `calculator` | Safely evaluates a limited arithmetic grammar; it cannot execute Python code. |
 | `search` | Searches a deterministic mock document index through a replaceable backend protocol. |
-| `todo` | Adds, lists, and completes user-owned items in a domain store shared across that user's windows. |
-| `weather` | Returns deterministic mock weather through a replaceable handler. |
+| `todo` | Adds, lists, and completes persistent items isolated to the current session. |
+| `get_weather` | Returns deterministic mock weather for a location and optional ISO date. |
 
 Registration, Schema validation, execution policy, and handlers are separate. Tool failures are
-structured results the model can correct; cancellation still propagates to the caller.
+structured results the model can correct; cancellation becomes a typed, observable terminal outcome.
 
 ## Sessions and context
 
 A session ID identifies one conversation window and a user ID owns it. Ownership is checked on every
 read and turn. Complete turns in the same session are serialized, while independent sessions can run
-concurrently. Two windows for one user therefore retain separate conversation histories, while shared
-user data such as Todo items lives in its own store rather than being copied into chat history.
+concurrently. Two windows for one user therefore retain separate conversation histories and separate
+todo lists. SQLite persists both event history and todo state across API restarts.
 
 Context includes user messages, assistant answers and tool calls, and paired tool results. It excludes
-execution logs and hidden reasoning. Once the number of completed turns exceeds the configured recent
-window, old complete turns are replaced in model context by a deterministic bounded summary. The full
-append-only event history remains available to the session store for recovery and auditing.
+execution logs and hidden reasoning. A conservative character budget includes tool Schemas and an
+output reserve. At the 75% reduction threshold, bulky tool results are pruned in the prompt view and
+old complete turns roll into a deterministic bounded summary. Call/result pairs stay intact, while the
+full append-only event history remains available for recovery and auditing. An irreducible overflow
+returns `context_overflow`; a provider-reported overflow receives one aggressive reduction retry.
 
 `AgentLimits` explicitly bounds model steps, tool calls, each tool's time, total turn time, model
-retries, output size, repeated identical calls, recent context turns, and summary size. Expected
-provider, validation, tool, ownership, and limit failures use stable error codes. Sanitized trace events
-record model decisions, retries, tool starts/results, and the terminal outcome.
+retries, output size, repeated identical calls, context size and output reserve, recent context turns,
+and summary size. Outcomes distinguish `completed`, `step_limit`, `timeout`, `cancelled`, and `failed`.
+Each turn and trace has a stable identifier. Sanitized events record context size and compression,
+model and tool timings, normalized token usage, retries, decisions, and the terminal outcome.
 
 ## HTTP API
 
@@ -115,15 +119,25 @@ Start the local API with `uv run python main.py`, then create and continue a ses
 ```bash
 curl -X POST http://127.0.0.1:8000/v1/sessions \
   -H 'content-type: application/json' \
-  -d '{"user_id":"user-a","session_id":"window-1"}'
+  -H 'X-User-ID: user-a' \
+  -d '{"session_id":"window-1"}'
 
 curl -X POST http://127.0.0.1:8000/v1/sessions/window-1/messages \
   -H 'content-type: application/json' \
-  -d '{"user_id":"user-a","message":"Check Shanghai weather and add a todo"}'
+  -H 'X-User-ID: user-a' \
+  -d '{"message":"Check Shanghai weather and add a todo"}'
+
+curl http://127.0.0.1:8000/v1/sessions/window-1 \
+  -H 'X-User-ID: user-a'
+
+curl http://127.0.0.1:8000/v1/sessions/window-1/events \
+  -H 'X-User-ID: user-a'
 ```
 
-The message response contains a typed terminal status, answer or safe error, and the sanitized trace
-for that turn.
+The identity header is required for every endpoint. The message response contains a typed terminal
+status, answer or safe error, and the sanitized trace for that turn. Metadata and event-history reads
+apply the same ownership check; both missing sessions and sessions owned by someone else return the
+same public `session_not_found` error.
 
 ## Verification
 
@@ -142,4 +156,14 @@ a tool-using follow-up in the same session:
 
 ```bash
 TIA_RUN_REAL_TESTS=1 uv run pytest tests/real/test_openrouter.py -vv
+```
+
+The browser end-to-end scenario launches a real FastAPI service and Streamlit frontend on temporary
+ports, drives Chromium through two isolated conversations, exercises weather and Todo tools, and
+restarts the API to verify SQLite recovery. It calls OpenRouter through the real LiteLLM adapter, so
+it requires `OPENAI_API_KEY` and is explicitly opt-in:
+
+```bash
+uv run playwright install chromium
+TIA_RUN_E2E_TESTS=1 uv run pytest tests/e2e/test_browser_flow.py -vv
 ```

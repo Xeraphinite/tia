@@ -22,8 +22,8 @@ def test_parser_extracts_reasoning_calls_content_and_usage() -> None:
                             {
                                 "id": "call-1",
                                 "function": {
-                                    "name": "weather",
-                                    "arguments": '{"city":"Shanghai"}',
+                                    "name": "get_weather",
+                                    "arguments": '{"location":"Shanghai"}',
                                 },
                             }
                         ],
@@ -36,7 +36,7 @@ def test_parser_extracts_reasoning_calls_content_and_usage() -> None:
 
     assert response.content == "working"
     assert response.reasoning == "private provider reasoning"
-    assert response.tool_calls[0].arguments == {"city": "Shanghai"}
+    assert response.tool_calls[0].arguments == {"location": "Shanghai"}
     assert response.usage.total_tokens == 14
 
 
@@ -59,6 +59,38 @@ def test_parser_preserves_malformed_arguments_as_recoverable_call() -> None:
     assert call.arguments is None
     assert call.parse_error
     assert call.id == "tool_call_0"
+
+
+def test_parser_preserves_multiple_ordered_calls_and_normalized_empty_output() -> None:
+    multiple = parse_litellm_response(
+        {
+            "choices": [
+                {
+                    "message": {
+                        "content": "progress",
+                        "tool_calls": [
+                            {
+                                "id": "first",
+                                "function": {"name": "search", "arguments": '{"query":"x"}'},
+                            },
+                            {
+                                "id": "second",
+                                "function": {
+                                    "name": "get_weather",
+                                    "arguments": '{"location":"Paris"}',
+                                },
+                            },
+                        ],
+                    }
+                }
+            ]
+        }
+    )
+    empty = parse_litellm_response({"choices": [{"message": {"content": None}}]})
+
+    assert [call.id for call in multiple.tool_calls] == ["first", "second"]
+    assert multiple.content == "progress"
+    assert empty.content is None and empty.tool_calls == ()
 
 
 def test_parser_rejects_missing_choices() -> None:
@@ -107,3 +139,21 @@ async def test_client_classifies_provider_failures(monkeypatch: pytest.MonkeyPat
         await client.complete([], [])
     assert raised.value.retryable
     assert raised.value.code == "model_temporarily_unavailable"
+
+
+async def test_client_classifies_context_overflow_without_exposing_provider_details(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+
+    async def completion(**kwargs: object) -> object:
+        del kwargs
+        raise ValueError("maximum context length exceeded with sensitive request details")
+
+    client = LiteLLMClient("openai/test", completion=completion)
+    with pytest.raises(ModelClientError) as raised:
+        await client.complete([], [])
+
+    assert raised.value.code == "context_overflow"
+    assert not raised.value.retryable
+    assert "sensitive" not in raised.value.safe_message

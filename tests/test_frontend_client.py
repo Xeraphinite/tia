@@ -16,12 +16,14 @@ from frontend.client import (
 class StubTransport:
     def __init__(self, responses: list[TransportResponse]) -> None:
         self.responses = responses
-        self.requests: list[tuple[str, dict[str, object], float]] = []
+        self.requests: list[tuple[str, dict[str, object], float, str]] = []
 
-    def post(self, url: str, payload: bytes, timeout_seconds: float) -> TransportResponse:
+    def post(
+        self, url: str, payload: bytes, timeout_seconds: float, user_id: str
+    ) -> TransportResponse:
         parsed = json.loads(payload)
         assert isinstance(parsed, dict)
-        self.requests.append((url, parsed, timeout_seconds))
+        self.requests.append((url, parsed, timeout_seconds, user_id))
         return self.responses.pop(0)
 
 
@@ -41,7 +43,12 @@ def test_client_creates_session_and_sends_message() -> None:
                     "answer": "It is 22°C.",
                     "error": None,
                     "trace": [
-                        {"sequence": 2, "kind": "tool_started", "data": {"name": "weather"}}
+                        {
+                            "sequence": 2,
+                            "kind": "tool_started",
+                            "data": {"name": "get_weather"},
+                            "event_id": "event-2",
+                        }
                     ],
                 },
             ),
@@ -54,9 +61,12 @@ def test_client_creates_session_and_sends_message() -> None:
 
     assert session_id == "session-1"
     assert result.answer == "It is 22°C."
-    assert result.trace[0].data == {"name": "weather"}
+    assert result.trace[0].data == {"name": "get_weather"}
+    assert result.trace[0].event_id == "event-2"
     assert transport.requests[0][0] == "http://localhost:8000/v1/sessions"
-    assert transport.requests[1][1] == {"user_id": "user-a", "message": "Weather?"}
+    assert transport.requests[0][1] == {}
+    assert transport.requests[0][3] == "user-a"
+    assert transport.requests[1][1] == {"message": "Weather?"}
 
 
 def test_client_surfaces_safe_api_error() -> None:
@@ -88,4 +98,3 @@ def test_client_rejects_invalid_endpoint_and_response() -> None:
         client.create_session("user-a")
 
     assert caught.value.code == "invalid_api_response"
-
